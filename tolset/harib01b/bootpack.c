@@ -1,3 +1,5 @@
+#include <stdio.h>
+
 #define COL8_000000		0
 #define COL8_FF0000		1
 #define COL8_00FF00		2
@@ -42,6 +44,8 @@ void HariMain(void)
 	//char *vram; /* used for BYTE address */
 	//int xsize, ysize;
 	struct BOOTINFO *binfo = (struct BOOTINFO *) 0x0ff0;
+	
+	char s[40];
 	
 	//extern char hankaku[4096];
 	/*static char font_A[16] = {
@@ -91,6 +95,10 @@ void HariMain(void)
 	*/
 	
 	putfonts8_asc(binfo->vram, binfo->scrnx, 8, 8, COL8_FFFFFF, "Hong Kong University, I come!");
+	
+	sprintf(s, "scrnx = %d", binfo->scrnx);
+	
+	putfonts8_asc(binfo->vram, binfo->scrnx, 16, 64, COL8_FFFFFF, s);
 	
 	for (;;) {
 		io_hlt();
