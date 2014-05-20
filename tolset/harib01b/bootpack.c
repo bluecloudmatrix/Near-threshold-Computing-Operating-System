@@ -28,6 +28,7 @@ void boxfill8(unsigned char *vram, int xsize, unsigned char c, int x0, int y0, i
 void init_screen(char *vram, int x, int y);
 
 void putfont8(char *vram, int xsize, int x, int y, char c, char *font);
+void putfonts8_asc(char *vram, int xsize, int x, int y, char c, unsigned char *s);
 
 struct BOOTINFO {
 	char cyls, leds, vmode, reserve;
@@ -42,10 +43,11 @@ void HariMain(void)
 	//int xsize, ysize;
 	struct BOOTINFO *binfo = (struct BOOTINFO *) 0x0ff0;
 	
-	static char font_A[16] = {
+	//extern char hankaku[4096];
+	/*static char font_A[16] = {
 		0x00, 0x18, 0x18, 0x18, 0x18, 0x24, 0x24, 0x24,
 		0x24, 0x7e, 0x42, 0x42, 0x42, 0xe7, 0x00, 0x00
-	};
+	};*/
 	
 	init_palette(); /* setting palette */
 	
@@ -81,7 +83,14 @@ void HariMain(void)
 	
 	init_screen(binfo->vram, binfo->scrnx, binfo->scrny);
 	
-	putfont8(binfo->vram, binfo->scrnx, 0, 0, COL8_FFFFFF, font_A);
+	//putfont8(binfo->vram, binfo->scrnx, 0, 0, COL8_FFFFFF, font_A);
+	/*
+	putfont8(binfo->vram, binfo->scrnx, 8, 8, COL8_FFFFFF, hankaku + 'H' * 16);
+	putfont8(binfo->vram, binfo->scrnx, 16, 8, COL8_FFFFFF, hankaku + 'K' * 16);
+	putfont8(binfo->vram, binfo->scrnx, 24, 8, COL8_FFFFFF, hankaku + 'U' * 16);
+	*/
+	
+	putfonts8_asc(binfo->vram, binfo->scrnx, 8, 8, COL8_FFFFFF, "Hong Kong University, I come!");
 	
 	for (;;) {
 		io_hlt();
@@ -179,6 +188,16 @@ void putfont8(char *vram, int xsize, int x, int y, char c, char *font)
 		if ((d & 0x04) != 0) p[5] = c;
 		if ((d & 0x02) != 0) p[6] = c;
 		if ((d & 0x01) != 0) p[7] = c;
+	}
+	return;
+}
+
+void putfonts8_asc(char *vram, int xsize, int x, int y, char c, unsigned char *s)
+{
+	extern char hankaku[4096];
+	for (; *s != 0x00; s++) {
+		putfont8(vram, xsize, x, y, c, hankaku + *s * 16);
+		x += 8;
 	}
 	return;
 }
