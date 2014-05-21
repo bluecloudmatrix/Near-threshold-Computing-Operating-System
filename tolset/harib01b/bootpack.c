@@ -1,12 +1,14 @@
 #include <stdio.h>
 #include "bootpack.h"
 
+extern struct FIFO8 keyfifo;
+
 void HariMain(void)
 {
 	struct BOOTINFO *binfo = (struct BOOTINFO *) ADR_BOOTINFO;
 	
-	char s[40], mcursor[256];
-	int mx, my;
+	char s[40], mcursor[256], keybuf[32];
+	int mx, my, i;
 	
 	mx = (binfo->scrnx - 16) / 2;  
 	my = (binfo->scrny - 28 - 16) / 2;
@@ -16,6 +18,8 @@ void HariMain(void)
 	init_pic();
 	
 	io_sti();
+	
+	fifo8_init(&keyfifo, 32, keybuf);
 	
 	init_palette(); /* setting palette */
 	
@@ -35,6 +39,16 @@ void HariMain(void)
 	io_out8(PIC1_IMR, 0xef); /* (11101111) */
 	
 	for (;;) {
-		io_hlt();
+		//io_hlt();
+		io_cli();
+		if (fifo8_status(&keyfifo) == 0) {
+			io_stihlt();
+		} else {
+			i = fifo8_get(&keyfifo);
+			io_sti();
+			sprintf(s, "%02X", i);
+			boxfill8(binfo->vram, binfo->scrnx, COL8_0000FF, 0, 16, 15, 31);
+			putfonts8_asc(binfo->vram, binfo->scrnx, 0, 16, COL8_FFFFFF, s);
+		}
 	}
 }
