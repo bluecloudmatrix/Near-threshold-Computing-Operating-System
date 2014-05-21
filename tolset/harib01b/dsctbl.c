@@ -1,22 +1,6 @@
 /* initialize GDT/IDT */
 
-struct SEGMENT_DESCRIPTOR {
-	short limit_low, base_low;
-	char base_mid, access_right;
-	char limit_high, base_high;
-};
-
-struct GATE_DESCRIPTOR {
-	short offset_low, selector;
-	char dw_count, access_right;
-	short offset_high;
-};
-
-void init_gdtidt(void);
-void set_segmdesc(struct SEGMENT_DESCRIPTOR *sd, unsigned int limit, int base, int ar);
-void set_gatedesc(struct GATE_DESCRIPTOR *gd, int offset, int selector, int ar);
-void load_gdtr(int limit, int addr);
-void load_idtr(int limit, int addr);
+#include "bootpack.h"
 
 void init_gdtidt(void)
 {
@@ -29,7 +13,9 @@ void init_gdtidt(void)
 		set_segmdesc(gdt + i, 0, 0, 0);
 	}
 	set_segmdesc(gdt + 1, 0xffffffff, 0x00000000, 0x4092); // it represents all the memory that CPU can manage. limit = 4G 
+														   // 0x4092   0100 0000 10010010 -> 32-bit mode, system special, read and write, not execute
 	set_segmdesc(gdt + 2, 0x0007ffff, 0x00280000, 0x409a); // 512K, from  0x00280000, prepared for bootpack.hrb
+														   // 0x409a -> 32-bit mode, system special(ring0), execute and read, not write
 	load_gdtr(0xffff, 0x00270000); // with the help of assembly
 	
 	/* initialize IDT */
