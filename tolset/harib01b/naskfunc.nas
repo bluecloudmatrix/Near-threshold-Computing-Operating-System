@@ -6,11 +6,13 @@
 [BITS 32]						; make machine language used for 32-bit mode
 [FILE "naskfunc.nas"]			; the file name of source code
 
-		GLOBAL	_io_hlt, _io_cli, _io_sti, _io_stihlt                                      ;_write_mem8
+		GLOBAL	_io_hlt, _io_cli, _io_sti, _io_stihlt                                      
 		GLOBAL	_io_in8, _io_in16, _io_in32
 		GLOBAL	_io_out8, _io_out16, _io_out32
 		GLOBAL	_io_load_eflags, _io_store_eflags
 		GLOBAL	_load_gdtr, _load_idtr
+		GLOBAL	_asm_inthandler21
+		EXTERN	_inthandler21
 		
 [SECTION .text]
 
@@ -89,10 +91,20 @@ _load_idtr:		; void load_idtr(int limit, int addr);
 		LIDT	[ESP+6]
 		RET		
 		
+_asm_inthandler21:
+		PUSH	ES
+		PUSH	DS
+		PUSHAD
+		MOV		EAX, ESP
+		PUSH	EAX
+		MOV		AX, SS
+		MOV		DS, AX
+		MOV		ES, AX
+		CALL	_inthandler21
+		POP		EAX
+		POPAD
+		POP		DS
+		POP		ES
+		IRETD
 		
-		
-;_write_mem8:	; void write_mem8(int addr, int data);
-;		MOV		ECX,[ESP+4]		; [ESP+4]saves address and read it into ECX
-;		MOV		AL,[ESP+8]		; [ESP+8]saves data and read it into AL
-;		MOV		[ECX],AL
-;		RET
+

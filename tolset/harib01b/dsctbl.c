@@ -22,6 +22,10 @@ void init_gdtidt(void)
 	for (i = 0; i < 256; i++) {
 		set_gatedesc(idt + i, 0, 0, 0);
 	}
+	
+	/* setting IDT */
+	set_gatedesc(idt + 0x21, (int) asm_inthandler21, 2 * 8, AR_INTGATE32);
+	
 	load_idtr(0x7ff, 0x0026f800); // with the help of assembly
 	
 	return;
