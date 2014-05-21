@@ -99,6 +99,7 @@ clean :
 	-$(DEL) graphic.nas
 	-$(DEL) dsctbl.nas
 	-$(DEL) int.nas
+	-$(DEL) fifo.nas
 	-$(DEL) bootpack.map
 	-$(DEL) bootpack.bim
 	-$(DEL) bootpack.hrb
