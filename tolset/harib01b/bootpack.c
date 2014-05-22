@@ -21,6 +21,7 @@ void HariMain(void)
 	struct BOOTINFO *binfo = (struct BOOTINFO *) ADR_BOOTINFO;
 	
 	char s[40], mcursor[256], keybuf[32], mousebuf[128];
+	unsigned char mouse_dbuf[3], mouse_phase;
 	int mx, my, i;
 	
 	mx = (binfo->scrnx - 16) / 2;  
@@ -50,6 +51,7 @@ void HariMain(void)
 	//putfonts8_asc(binfo->vram, binfo->scrnx, 16, 64, COL8_FFFFFF, s);
 
 	enable_mouse();
+	mouse_phase = 0; // enter the 0xfa state: waiting for mouse
 	
 	for (;;) {
 		//io_hlt();
@@ -64,11 +66,35 @@ void HariMain(void)
 				boxfill8(binfo->vram, binfo->scrnx, COL8_0000FF, 0, 16, 15, 31);
 				putfonts8_asc(binfo->vram, binfo->scrnx, 0, 16, COL8_FFFFFF, s);
 			} else if (fifo8_status(&mousefifo) != 0) {
-				i = fifo8_get(&mousefifo);
+				/*i = fifo8_get(&mousefifo);
 				io_sti();
 				sprintf(s, "%02X", i);
 				boxfill8(binfo->vram, binfo->scrnx, COL8_0000FF, 32, 16, 47, 31);
-				putfonts8_asc(binfo->vram, binfo->scrnx, 32, 16, COL8_FFFFFF, s);
+				putfonts8_asc(binfo->vram, binfo->scrnx, 32, 16, COL8_FFFFFF, s);*/
+				
+				i = fifo8_get(&mousefifo);
+				io_sti();
+				if(mouse_phase == 0) {
+					// waiting for mouse
+					if (i == 0xfa) {
+						mouse_phase = 1;
+					}
+				} else if (mouse_phase == 1) {
+					// first byte from mouse
+					mouse_dbuf[0] = i;
+					mouse_phase = 2;
+				} else if (mouse_phase == 2) {
+					// second byte from mouse
+					mouse_dbuf[1] = i;
+					mouse_phase = 3;
+				} else if (mouse_phase == 3) {
+					mouse_dbuf[2] = i;
+					mouse_phase = 1;
+					
+					sprintf(s, "%02X %02X %02X", mouse_dbuf[0], mouse_dbuf[1], mouse_dbuf[2]);
+					boxfill8(binfo->vram, binfo->scrnx, COL8_0000FF, 32, 16, 32 + 8 * 8 -1, 31);
+					putfonts8_asc(binfo->vram, binfo->scrnx, 32, 16, COL8_FFFFFF, s);
+				}
 			}
 		}
 	}
