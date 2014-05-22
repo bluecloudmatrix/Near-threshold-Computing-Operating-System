@@ -4,8 +4,8 @@
 
 void init_gdtidt(void)
 {
-	struct SEGMENT_DESCRIPTOR *gdt = (struct SEGMENT_DESCRIPTOR *) 0X00270000;
-	struct GATE_DESCRIPTOR    *idt = (struct GATE_DESCRIPTOR    *) 0X0026f800;
+	struct SEGMENT_DESCRIPTOR *gdt = (struct SEGMENT_DESCRIPTOR *) ADR_GDT;
+	struct GATE_DESCRIPTOR    *idt = (struct GATE_DESCRIPTOR    *) ADR_IDT;
 	int i;
 	
 	/* initialize GDT */
@@ -16,14 +16,14 @@ void init_gdtidt(void)
 														   // 0x4092   0100 0000 10010010 -> 32-bit mode, system special, read and write, not execute
 	set_segmdesc(gdt + 2, 0x0007ffff, 0x00280000, 0x409a); // 512K, from  0x00280000, prepared for bootpack.hrb
 														   // 0x409a -> 32-bit mode, system special(ring0), execute and read, not write
-	load_gdtr(0xffff, 0x00270000); // with the help of assembly
+	load_gdtr(0xffff, ADR_GDT); // with the help of assembly
 	
 	/* initialize IDT */
 	for (i = 0; i < 256; i++) {
 		set_gatedesc(idt + i, 0, 0, 0);
 	}
 	
-	load_idtr(0x7ff, 0x0026f800); // with the help of assembly
+	load_idtr(0x7ff, ADR_IDT); // with the help of assembly
 	
 	/* setting IDT */
 	set_gatedesc(idt + 0x21, (int) asm_inthandler21, 2 * 8, AR_INTGATE32);

@@ -1,11 +1,12 @@
-
 /* asmhead.nas */
-struct BOOTINFO {
-	char cyls, leds, vmode, reserve;
-	short scrnx, scrny;
+struct BOOTINFO { /* 0x0ff0-0x0fff */
+	char cyls;  
+	char leds; 
+	char vmode;  
+	char reserve;
+	short scrnx, scrny;  
 	char *vram;
 };
-
 #define ADR_BOOTINFO	0x00000ff0
 
 /* naskfunc.nas */
@@ -20,22 +21,29 @@ void io_store_eflags(int eflags);
 void load_gdtr(int limit, int addr);
 void load_idtr(int limit, int addr);
 void asm_inthandler21(void);
-void asm_inthandler2c(void);
 void asm_inthandler27(void);
+void asm_inthandler2c(void);
+
+/* fifo.c */
+struct FIFO8 {
+	unsigned char *buf;
+	int p, q, size, free, flags;
+};
+void fifo8_init(struct FIFO8 *fifo, int size, unsigned char *buf);
+int fifo8_put(struct FIFO8 *fifo, unsigned char data);
+int fifo8_get(struct FIFO8 *fifo);
+int fifo8_status(struct FIFO8 *fifo);
 
 /* graphic.c */
 void init_palette(void);
 void set_palette(int start, int end, unsigned char *rgb);
 void boxfill8(unsigned char *vram, int xsize, unsigned char c, int x0, int y0, int x1, int y1);
-void init_screen(char *vram, int x, int y);
-
+void init_screen8(char *vram, int x, int y);
 void putfont8(char *vram, int xsize, int x, int y, char c, char *font);
 void putfonts8_asc(char *vram, int xsize, int x, int y, char c, unsigned char *s);
-
 void init_mouse_cursor8(char *mouse, char bc);
 void putblock8_8(char *vram, int vxsize, int pxsize,
 	int pysize, int px0, int py0, char *buf, int bxsize);
-
 #define COL8_000000		0
 #define COL8_FF0000		1
 #define COL8_00FF00		2
@@ -53,23 +61,20 @@ void putblock8_8(char *vram, int vxsize, int pxsize,
 #define COL8_008484		14
 #define COL8_848484		15
 
-/* GDT/IDT */
 /* dsctbl.c */
 struct SEGMENT_DESCRIPTOR {
 	short limit_low, base_low;
 	char base_mid, access_right;
 	char limit_high, base_high;
 };
-
 struct GATE_DESCRIPTOR {
 	short offset_low, selector;
 	char dw_count, access_right;
 	short offset_high;
 };
-
+void init_gdtidt(void);
 void set_segmdesc(struct SEGMENT_DESCRIPTOR *sd, unsigned int limit, int base, int ar);
 void set_gatedesc(struct GATE_DESCRIPTOR *gd, int offset, int selector, int ar);
-void init_gdtidt(void);
 #define ADR_IDT			0x0026f800
 #define LIMIT_IDT		0x000007ff
 #define ADR_GDT			0x00270000
@@ -81,10 +86,7 @@ void init_gdtidt(void);
 #define AR_INTGATE32	0x008e
 
 /* int.c */
-
 void init_pic(void);
-void inthandler21(int *esp);
-void inthandler2c(int *esp);
 void inthandler27(int *esp);
 #define PIC0_ICW1		0x0020
 #define PIC0_OCW2		0x0020
@@ -99,12 +101,20 @@ void inthandler27(int *esp);
 #define PIC1_ICW3		0x00a1
 #define PIC1_ICW4		0x00a1
 
-/* fifo.c */
-struct FIFO8 {
-	unsigned char *buf;
-	int p, q, size, free, flags;
+/* keyboard.c */
+void inthandler21(int *esp);
+void wait_KBC_sendready(void);
+void init_keyboard(void);
+extern struct FIFO8 keyfifo;
+#define PORT_KEYDAT		0x0060
+#define PORT_KEYCMD		0x0064
+
+/* mouse.c */
+struct MOUSE_DEC {
+	unsigned char buf[3], phase;
+	int x, y, btn;
 };
-void fifo8_init(struct FIFO8 *fifo, int size, unsigned char *buf);
-int fifo8_put(struct FIFO8 *fifo, unsigned char data);
-int fifo8_get(struct FIFO8 *fifo);
-int fifo8_status(struct FIFO8 *fifo);
+void inthandler2c(int *esp);
+void enable_mouse(struct MOUSE_DEC *mdec);
+int mouse_decode(struct MOUSE_DEC *mdec, unsigned char dat);
+extern struct FIFO8 mousefifo;

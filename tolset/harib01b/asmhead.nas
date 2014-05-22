@@ -1,7 +1,7 @@
 ; haribote-os boot asm
 ; TAB=4
 
-BOTPAK	EQU		0x00280000		; 
+BOTPAK	EQU		0x00280000		; EQU pseudoinstruction, like #define
 DSKCAC	EQU		0x00100000		; 
 DSKCAC0	EQU		0x00008000		; 
 
@@ -31,36 +31,36 @@ VRAM	EQU		0x0ff8			;
 		INT		0x16 			; keyboard BIOS
 		MOV		[LEDS],AL
 
-;
-;	
-;	
-;	
+; PIC disables all interrupts 
+;	io_out(PIC0_IMR, 0xff); disable all interrupts of master PIC
+;	io_out(PIC1_IMR, 0xff); disable all interrupts of slave PIC
+;	io_cli(); disable the interrupt of CPU level
 
 		MOV		AL,0xff
-		OUT		0x21,AL
-		NOP						; 
-		OUT		0xa1,AL
+		OUT		0x21,AL         ; master PIC
+		NOP						; rest for a clock, do nothing, avoid executing NOP continuously
+		OUT		0xa1,AL			; slave PIC
 
-		CLI						; 
+		CLI						; disable the interrupt of CPU level 
 
-;
+; in order to let CPU access more than 1MB memory, setting A20 GATE
 
 		CALL	waitkbdout
 		MOV		AL,0xd1
 		OUT		0x64,AL
 		CALL	waitkbdout
-		MOV		AL,0xdf			; enable A20
+		MOV		AL,0xdf			; enable A20, A20's open let all memory accessed
 		OUT		0x60,AL
 		CALL	waitkbdout
 
-; 
+; switch to protected mode
 
 [INSTRSET "i486p"]				; 
 
 		LGDT	[GDTR0]			;
 		MOV		EAX,CR0
-		AND		EAX,0x7fffffff	; 
-		OR		EAX,0x00000001	; 
+		AND		EAX,0x7fffffff	; set bit31 to 0, for page
+		OR		EAX,0x00000001	; set bit0 to 1, for switching to protected mode
 		MOV		CR0,EAX
 		JMP		pipelineflush
 pipelineflush:
@@ -100,7 +100,7 @@ pipelineflush:
 ; 
 ;	
 
-; 
+; start bootpack
 
 		MOV		EBX,BOTPAK
 		MOV		ECX,[EBX+16]
