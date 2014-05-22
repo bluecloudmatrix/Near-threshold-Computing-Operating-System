@@ -1,6 +1,8 @@
 #include <stdio.h>
 #include "bootpack.h"
 
+unsigned int memtest(unsigned int start, unsigned int end);
+
 extern struct FIFO8 keyfifo;
 extern struct FIFO8 mousefifo;
 
@@ -9,7 +11,7 @@ void HariMain(void)
 	struct BOOTINFO *binfo = (struct BOOTINFO *) ADR_BOOTINFO;
 	
 	char s[40], mcursor[256], keybuf[32], mousebuf[128];
-	int mx, my, i;
+	int mx, my, i, j;
 	struct MOUSE_DEC mdec;
 	
 	mx = (binfo->scrnx - 16) / 2;  
@@ -39,6 +41,12 @@ void HariMain(void)
 	//putfonts8_asc(binfo->vram, binfo->scrnx, 16, 64, COL8_FFFFFF, s);
 
 	enable_mouse(&mdec);
+	
+	j = memtest(0x00400000, 0xbfffffff) / (1024 * 1024);
+	
+	sprintf(s, "memory %dMB", j);
+	
+	putfonts8_asc(binfo->vram, binfo->scrnx, 0, 32, COL8_FFFFFF, s);
 	
 	for (;;) {
 		//io_hlt();
@@ -102,15 +110,27 @@ void HariMain(void)
 	}
 }
 
-/* memory checking */
 
+/*
 unsigned int memtest_sub(unsigned int start, unsigned int end)
 {
+	unsigned int i;
+	for (i = start; i <= end; i += 0x1000) {}
+	return i;
+}
+*/
+
+/*unsigned int memtest_sub(unsigned int start, unsigned int end)
+{
 	unsigned int i, *p, old, pat0 = 0xaa55aa55, pat1 = 0x55aa55aa;
-	for (i = start; i <= end; i += 4) {
-		p = (unsigned int *) i;
+	//for (i = start; i <= end; i += 4) {
+	//	p = (unsigned int *) i;
+	for (i = start; i <= end; i+= 0x1000) {
+		p = (unsigned int *) (i + 0xffc);
 		old = *p;
-		*p = pat0;
+		*p = pat0; // every time we check 4 bytes
+		
+		// When get the data in p, some machines will read pat0 not *p, so we reverse
 		*p ^= 0xffffffff;
 		if (*p != pat1) {
 not_memory:
@@ -118,6 +138,7 @@ not_memory:
 			break;
 		}
 		*p ^= 0xffffffff;
+		//
 		if (*p != pat0) {
 			goto not_memory;
 		}
@@ -125,6 +146,9 @@ not_memory:
 	}
 	return i;
 }
+*/
+
+/* memory checking */
 
 #define EFLAGS_AC_BIT		0x00040000
 #define CR0_CACHE_DISABLE	0x60000000
@@ -151,6 +175,13 @@ unsigned int memtest(unsigned int start, unsigned int end)
 	}
 	
 	i = memtest_sub(start, end); // realize memory checking
+
+	//test
+	//struct BOOTINFO *binfo = (struct BOOTINFO *) ADR_BOOTINFO;
+	//char s[40];
+	//sprintf(s, "%d", i);
+	//putfonts8_asc(binfo->vram, binfo->scrnx, 0, 80, COL8_FFFFFF, s);
+	//
 	
 	if (flg486 != 0) {
 		cr0 = load_cr0();
