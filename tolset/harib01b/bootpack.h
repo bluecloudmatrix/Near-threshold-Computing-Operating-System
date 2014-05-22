@@ -20,6 +20,8 @@ void io_store_eflags(int eflags);
 void load_gdtr(int limit, int addr);
 void load_idtr(int limit, int addr);
 void asm_inthandler21(void);
+void asm_inthandler2c(void);
+void asm_inthandler27(void);
 
 /* graphic.c */
 void init_palette(void);
@@ -82,6 +84,8 @@ void init_gdtidt(void);
 
 void init_pic(void);
 void inthandler21(int *esp);
+void inthandler2c(int *esp);
+void inthandler27(int *esp);
 #define PIC0_ICW1		0x0020
 #define PIC0_OCW2		0x0020
 #define PIC0_IMR		0x0021

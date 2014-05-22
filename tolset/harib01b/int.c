@@ -37,3 +37,28 @@ void inthandler21(int *esp)
 	fifo8_put(&keyfifo, data);
 	return;
 }
+
+struct FIFO8 mousefifo;
+
+void inthandler2c(int *esp)
+/* PS/2 mouse */
+{
+	/*struct BOOTINFO *binfo = (struct BOOTINFO *) ADR_BOOTINFO;
+	boxfill8(binfo->vram, binfo->scrnx, COL8_000000, 0, 0, 32 * 8 - 1, 15);
+	putfonts8_asc(binfo->vram, binfo->scrnx, 0, 0, COL8_FFFFFF, "INT 2C (IRQ-12) : PS/2 mouse");
+	for (;;) {
+		io_hlt();
+	}*/
+	unsigned char data;
+	io_out8(PIC1_OCW2, 0x64);
+	io_out8(PIC0_OCW2, 0x62); //inform master PIC
+	data = io_in8(PORT_KEYDAT);
+	fifo8_put(&mousefifo, data);
+	return;
+}
+
+void inthandler27(int *esp)
+{
+	io_out8(PIC0_OCW2, 0x67); /* IRQ-07 */
+	return;
+}
