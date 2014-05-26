@@ -1,6 +1,8 @@
 #include <stdio.h>
 #include "bootpack.h"
 
+#define MEMMAN_ADDR		0x003c0000
+
 extern struct FIFO8 keyfifo;
 extern struct FIFO8 mousefifo;
 
@@ -11,6 +13,8 @@ void HariMain(void)
 	char s[40], mcursor[256], keybuf[32], mousebuf[128];
 	int mx, my, i, j;
 	struct MOUSE_DEC mdec;
+	unsigned int memtotal;
+	struct MEMMAN *memman = (struct MEMMAN *) MEMMAN_ADDR;
 	
 	mx = (binfo->scrnx - 16) / 2;  
 	my = (binfo->scrny - 28 - 16) / 2;
@@ -40,10 +44,17 @@ void HariMain(void)
 
 	enable_mouse(&mdec);
 	
-	j = memtest(0x00400000, 0xbfffffff) / (1024 * 1024);
+	//j = memtest(0x00400000, 0xbfffffff) / (1024 * 1024);
+	//sprintf(s, "memory %dMB", j);
+	//putfonts8_asc(binfo->vram, binfo->scrnx, 0, 32, COL8_FFFFFF, s);
 	
-	sprintf(s, "memory %dMB", j);
+	memtotal = memtest(0x00400000, 0xbfffffff);
+	memman_init(memman);
+	memman_free(memman, 0x00001000, 0x0009e000); /* 0x00001000 - 0x0009efff */
+	memman_free(memman, 0x00400000, memtotal - 0x00400000);
 	
+	sprintf(s, "memory %dMB   free : %dKB",
+			memtotal / (1024 * 1024), memman_total(memman) / 1024);
 	putfonts8_asc(binfo->vram, binfo->scrnx, 0, 32, COL8_FFFFFF, s);
 	
 	for (;;) {
