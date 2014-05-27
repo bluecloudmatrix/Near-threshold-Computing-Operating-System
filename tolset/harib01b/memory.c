@@ -120,7 +120,7 @@ unsigned int memman_alloc(struct MEMMAN *man, unsigned int size)
 					man->free[i] = man->free[i + 1];
 				}
 			}
-			return 0;
+			return a;
 		}
 	}
 	return 0; // there is no free memory 

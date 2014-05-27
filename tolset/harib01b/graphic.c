@@ -59,7 +59,7 @@ void boxfill8(unsigned char *vram, int xsize, unsigned char c, int x0, int y0, i
 	return;
 }
 
-void init_screen(char *vram, int x, int y)
+void init_screen8(char *vram, int x, int y)
 {
 	/* background */
 	boxfill8(vram, x, COL8_0000FF, 0, 0         , x - 1, y - 29);
@@ -68,12 +68,17 @@ void init_screen(char *vram, int x, int y)
 	boxfill8(vram, x, COL8_FFFFFF, 0, y - 26, x - 1, y - 1);
 	
 	/* left down */
-	boxfill8(vram, x, COL8_FFFFFF,  3,         y - 24, 59,         y - 24);
-	boxfill8(vram, x, COL8_FFFFFF,  2,         y - 24,  2,         y -  4);
-	boxfill8(vram, x, COL8_848484,  3,         y -  4, 59,         y -  4);
-	boxfill8(vram, x, COL8_848484, 59,         y - 23, 59,         y -  5);
-	boxfill8(vram, x, COL8_000000,  2,         y -  3, 59,         y -  3);
-	boxfill8(vram, x, COL8_000000, 60,         y - 24, 60,         y -  3);
+	boxfill8(vram, x, COL8_FFFFFF,  3,     y - 24, 59,     y - 24);
+	boxfill8(vram, x, COL8_FFFFFF,  2,     y - 24,  2,     y -  4);
+	boxfill8(vram, x, COL8_848484,  3,     y -  4, 59,     y -  4);
+	boxfill8(vram, x, COL8_848484, 59,     y - 23, 59,     y -  5);
+	boxfill8(vram, x, COL8_000000,  2,     y -  3, 59,     y -  3);
+	boxfill8(vram, x, COL8_000000, 60,     y - 24, 60,     y -  3);
+
+	boxfill8(vram, x, COL8_848484, x - 47, y - 24, x -  4, y - 24);
+	boxfill8(vram, x, COL8_848484, x - 47, y - 23, x - 47, y -  4);
+	boxfill8(vram, x, COL8_FFFFFF, x - 47, y -  3, x -  4, y -  3);
+	boxfill8(vram, x, COL8_FFFFFF, x -  3, y - 24, x -  3, y -  3);
 	
 	return;
 }
