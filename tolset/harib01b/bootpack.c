@@ -62,7 +62,7 @@ void HariMain(void)
 	sprintf(s, "(%3d, %3d)", mx, my);
 	putfonts8_asc(buf_back, binfo->scrnx, 0, 0, COL8_FFFFFF, s);
 	
-	sheet_refresh(shtctl);  // show the vram
+	sheet_refresh(shtctl, sht_back, 0, 0, binfo->scrnx, 80);  // show the vram
 
 
 	//test
@@ -84,7 +84,7 @@ void HariMain(void)
 				sprintf(s, "%02X", i);
 				boxfill8(buf_back, binfo->scrnx, COL8_0000FF, 0, 16, 15, 31);
 				putfonts8_asc(buf_back, binfo->scrnx, 0, 16, COL8_FFFFFF, s);
-				sheet_refresh(shtctl);
+				sheet_refresh(shtctl, sht_back, 0, 16, 16, 32);
 			} else if (fifo8_status(&mousefifo) != 0) {				
 				i = fifo8_get(&mousefifo);
 				io_sti();
@@ -102,6 +102,7 @@ void HariMain(void)
 					}
 					boxfill8(buf_back, binfo->scrnx, COL8_0000FF, 32, 16, 32 + 15 * 8 - 1, 31);
 					putfonts8_asc(buf_back, binfo->scrnx, 32, 16, COL8_FFFFFF, s);
+					sheet_refresh(shtctl, sht_back, 32, 16, 32 + 15 * 8, 32);
 					
 					// move mouse cursor
 					mx += mdec.x;
@@ -121,6 +122,7 @@ void HariMain(void)
 					sprintf(s, "(%3d, %3d)", mx, my);
 					boxfill8(buf_back, binfo->scrnx, COL8_0000FF, 0, 0, 79, 15); // hide coordinate
 					putfonts8_asc(buf_back, binfo->scrnx, 0, 0, COL8_FFFFFF, s);  // show coordinate
+					sheet_refresh(shtctl, sht_back, 0, 0, 80, 16);
 					sheet_slide(shtctl, sht_mouse, mx, my);
 				}
 			}
