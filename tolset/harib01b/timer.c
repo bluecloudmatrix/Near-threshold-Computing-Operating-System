@@ -1,41 +1,105 @@
 #include "bootpack.h"
 
+#define TIMER_FLAGS_ALLOC 	1 // has been set
+#define TIMER_FLAGS_USING	2 // the timer is running 
+
 struct TIMERCTL timerctl;
 
 // the interrupt of IRQ0
 void init_pit(void)
 {
+	int i;
 	io_out8(PIT_CTRL, 0x34);
 	//0x2e9c indicates that the frequency of interrupt is 100HZ
 	io_out8(PIT_CNT0, 0x9c); // lower eight bits of interrupt cycle
 	io_out8(PIT_CNT0, 0x2e); // higher eight bits of interrupt cycle
 	timerctl.count = 0;
-	timerctl.timeout = 0;
-	return;
-}
-
-// when IRQ0 happens, invoke the interrupt handler: inthandler20
-void inthandler20(int *esp)
-{
-	io_out8(PIC0_OCW2, 0x60); // Inform PIC the information that IRQ0-00 has been received.
-	timerctl.count++; // each second it adds 100
-	if (timerctl.timeout > 0) {
-		timerctl.timeout--;
-		if (timerctl.timeout == 0) {
-			fifo8_put(timerctl.fifo, timerctl.data);
-		}
+	timerctl.next = 0xffffffff;
+	timerctl.using = 0;
+	for (i = 0; i < MAX_TIMER; i++) {
+		timerctl.timers0[i].flags = 0;
 	}
 	return;
 }
 
-void settimer(unsigned int timeout, struct FIFO8 *fifo, unsigned char data)
+struct TIMER *timer_alloc(void)
 {
-	int eflags;
-	eflags = io_load_eflags();
+	int i;
+	for (i = 0; i < MAX_TIMER; i++) {
+		if (timerctl.timers0[i].flags == 0) {
+			timerctl.timers0[i].flags = TIMER_FLAGS_ALLOC;
+			return &timerctl.timers0[i];
+		}
+	}
+	return 0; // not found
+}
+
+void timer_free(struct TIMER *timer)
+{
+	timer->flags = 0; // not use
+	return;
+}
+
+void timer_init(struct TIMER *timer, struct FIFO8 *fifo, unsigned char data)
+{
+	timer->fifo = fifo;
+	timer->data = data;
+	return;
+}
+
+void timer_settime(struct TIMER *timer, unsigned int timeout)
+{
+	int e, i, j;
+	timer->timeout = timeout + timerctl.count;
+	timer->flags = TIMER_FLAGS_USING;
+	e = io_load_eflags();
 	io_cli();
-	timerctl.timeout = timeout;
-	timerctl.fifo = fifo;
-	timerctl.data = data;
-	io_store_eflags(eflags);
+	
+	for (i = 0; i < timerctl.using; i++) {
+		if (timerctl.timers[i]->timeout >= timer->timeout) {
+			break;
+		}
+	}
+
+	for (j = timerctl.using; j > i; j--) {
+		timerctl.timers[j] = timerctl.timers[j - 1];
+	}
+	timerctl.using++;
+
+	timerctl.timers[i] = timer;
+	timerctl.next = timerctl.timers[0]->timeout;
+	io_store_eflags(e);
+	return;
+}
+
+// when IRQ0(timer interrupt) happens, invoke the interrupt handler: inthandler20
+void inthandler20(int *esp)
+{
+	int i, j;
+	io_out8(PIC0_OCW2, 0x60); // Inform PIC the information that IRQ0-00 has been received.
+	timerctl.count++; // each second it adds 100
+	if (timerctl.next > timerctl.count) {
+		return; // the next time has not arrived, so finish
+	}
+	// checking in all of the timers which are being used, which timer time out.
+	// now we do not have to do MAX_TIMER times of 'if'
+	for (i = 0; i < timerctl.using; i++) {
+		if (timerctl.timers[i]->timeout > timerctl.count) {
+			break;
+		}
+		// timeout
+		timerctl.timers[i]->flags = TIMER_FLAGS_ALLOC;
+		fifo8_put(timerctl.timers[i]->fifo, timerctl.timers[i]->data);
+	}
+	// a timer has timed out, we need shift the rest using timer
+	timerctl.using -= i;
+	for (j = 0; j < timerctl.using; j++) {
+		timerctl.timers[j] = timerctl.timers[i + j];
+	}
+	if (timerctl.using > 0) {
+		timerctl.next = timerctl.timers[0]->timeout;
+	} else {
+		timerctl.next = 0xffffffff;
+	}
 	return;
 }

@@ -172,11 +172,19 @@ void sheet_slide(struct SHEET *sht, int vx0, int vy0);
 void sheet_free(struct SHEET *sht);
 
 /* timer.c */
-struct TIMERCTL {
-	unsigned int count;
-	unsigned int timeout;
+#define MAX_TIMER 500
+
+// define a timer
+struct TIMER {
+	unsigned int timeout, flags; // flags is used to record the status of the timer
 	struct FIFO8 *fifo;
 	unsigned char data;
+};
+
+struct TIMERCTL {
+	unsigned int count, next, using;
+	struct TIMER *timers[MAX_TIMER]; // the address of timers which have been arranged in some kind of order
+	struct TIMER timers0[MAX_TIMER]; // the entity of MAX_TIMER timers
 };
 
 #define PIT_CTRL 0x0043
@@ -186,4 +194,3 @@ extern struct TIMERCTL timerctl;
 
 void init_pit(void);
 void inthandler20(int *esp);
-void settimer(unsigned int timeout, struct FIFO8 *fifo, unsigned char data);
