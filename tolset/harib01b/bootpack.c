@@ -10,7 +10,10 @@ extern struct FIFO8 mousefifo;
 void HariMain(void)
 {
 	struct BOOTINFO *binfo = (struct BOOTINFO *) ADR_BOOTINFO;
-	char s[40], keybuf[32], mousebuf[128];
+	
+	struct FIFO8 timerfifo; 
+	
+	char s[40], keybuf[32], mousebuf[128], timerbuf[8];
 	int mx, my, i;
 	struct MOUSE_DEC mdec;
 	unsigned int memtotal, count = 0;
@@ -19,6 +22,7 @@ void HariMain(void)
 	struct SHEET *sht_back, *sht_mouse, *sht_win;
 	unsigned char *buf_back, buf_mouse[256], *buf_win;
 
+	
 	// interrupt setting
 	init_gdtidt();
 	init_pic();	
@@ -76,6 +80,11 @@ void HariMain(void)
 	
 	sheet_refresh(sht_back, 0, 0, binfo->scrnx, 80);  // show the vram
 
+	
+	//timer buf
+	fifo8_init(&timerfifo, 8, timerbuf);
+	settimer(1000, &timerfifo, 1);
+	
 
 	//test
 /*	init_screen8(binfo->vram, binfo->scrnx, binfo->scrny); // initialize the show of screen
@@ -94,8 +103,9 @@ void HariMain(void)
 	
 		//io_hlt(); // in order to count in a high speed, do not use htl to let CPU sleep
 		io_cli();
-		if (fifo8_status(&keyfifo) + fifo8_status(&mousefifo) == 0) {
-			io_stihlt();
+		if (fifo8_status(&keyfifo) + fifo8_status(&mousefifo) + fifo8_status(&timerfifo) == 0) {
+			//io_stihlt();
+			io_sti();
 		} else {
 			if(fifo8_status(&keyfifo) != 0) {
 				i = fifo8_get(&keyfifo);
@@ -154,6 +164,12 @@ void HariMain(void)
 					sheet_refresh(sht_back, 0, 0, 80, 16);
 					sheet_slide(sht_mouse, mx, my);
 				}
+			} else if (fifo8_status(&timerfifo) != 0) {
+				i = fifo8_get(&timerfifo);
+				io_sti();
+				putfonts8_asc(buf_back, binfo->scrnx, 0, 84, COL8_FFFFFF, "10[sec]");
+				sheet_refresh(sht_back, 0, 84, 56, 100);
+				
 			}
 		}
 	}
