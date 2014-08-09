@@ -6,6 +6,7 @@
 extern struct FIFO8 keyfifo;
 extern struct FIFO8 mousefifo;
 
+
 void HariMain(void)
 {
 	struct BOOTINFO *binfo = (struct BOOTINFO *) ADR_BOOTINFO;
@@ -21,11 +22,12 @@ void HariMain(void)
 	// interrupt setting
 	init_gdtidt();
 	init_pic();	
-	io_sti();	
+	io_sti();	// The initialize of IDT/PIC has been over, so relieve the ban of CPU interrupt
 	fifo8_init(&keyfifo, 32, keybuf);            // used for receiving interrupt information
 	fifo8_init(&mousefifo, 128, mousebuf);	     // used for interrupt interrupt information
-	io_out8(PIC0_IMR, 0xf9); // (11111001) 
-	io_out8(PIC1_IMR, 0xef); // (11101111) 
+	init_pit();
+	io_out8(PIC0_IMR, 0xf8); // PIT and PIC1 and keyboard are set to permission: 11111000
+	io_out8(PIC1_IMR, 0xef); // Mouse is set to permission: 11101111 
 	init_keyboard();	
 	enable_mouse(&mdec);
 	
@@ -83,11 +85,11 @@ void HariMain(void)
 
 	
 	for (;;) {
-		count++; // high-speed counting
-		sprintf(s, "%010d", count);
+		//count++; // high-speed counting
+		//sprintf(s, "%010d", count);
+		sprintf(s, "%010d", timerctl.count);
 		boxfill8(buf_win, 160, COL8_C6C6C6, 40, 28, 119, 43);
 		putfonts8_asc(buf_win, 160, 40, 28, COL8_000000, s);
-		
 		sheet_refresh(sht_win, 40, 28, 120, 44);
 	
 		//io_hlt(); // in order to count in a high speed, do not use htl to let CPU sleep
