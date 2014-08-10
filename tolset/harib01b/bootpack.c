@@ -3,17 +3,16 @@
 
 #define MEMMAN_ADDR		0x003c0000
 
-extern struct FIFO8 keyfifo;
-extern struct FIFO8 mousefifo;
-
+void make_window8(unsigned char *buf, int xsize, int ysize, char *title);
+void putfonts8_asc_sht(struct SHEET *sht, int x, int y, int c, int b, char *s, int l);
 
 void HariMain(void)
 {
+	// preparing all kinds of variables
 	struct BOOTINFO *binfo = (struct BOOTINFO *) ADR_BOOTINFO;
-	
-	struct FIFO8 timerfifo, timerfifo2, timerfifo3; 
-	
-	char s[40], keybuf[32], mousebuf[128], timerbuf[8], timerbuf2[8], timerbuf3[8];
+	struct FIFO32 fifo; // shared FIFO buffer
+	int fifobuf[128];
+	char s[40];
 	struct TIMER *timer, *timer2, *timer3;
 	int mx, my, i;
 	struct MOUSE_DEC mdec;
@@ -28,14 +27,15 @@ void HariMain(void)
 	init_gdtidt();
 	init_pic();	
 	io_sti();	// The initialize of IDT/PIC has been over, so relieve the ban of CPU interrupt
-	fifo8_init(&keyfifo, 32, keybuf);            // used for receiving interrupt information
-	fifo8_init(&mousefifo, 128, mousebuf);	     // used for interrupt interrupt information
-	init_pit();
+	init_pit(); // about timer
+	
+	// shared FIFO buffer setting
+	fifo32_init(&fifo, 128, fifobuf);            // used for receiving interrupt information
+	init_keyboard(&fifo, 256);	
+	enable_mouse(&fifo, 512, &mdec);
 	io_out8(PIC0_IMR, 0xf8); // PIT and PIC1 and keyboard are set to permission: 11111000
 	io_out8(PIC1_IMR, 0xef); // Mouse is set to permission: 11101111 
-	init_keyboard();	
-	enable_mouse(&mdec);
-	
+
 	// memory operation
 	memtotal = memtest(0x00400000, 0xbfffffff);
 	memman_init(memman);
@@ -82,54 +82,40 @@ void HariMain(void)
 	sheet_refresh(sht_back, 0, 0, binfo->scrnx, 80);  // show the vram
 
 	
-	//timer buf
-	fifo8_init(&timerfifo, 8, timerbuf);
+	// timer buf
 	timer = timer_alloc();
-	timer_init(timer, &timerfifo, 1);
+	timer_init(timer, &fifo, 10);
 	timer_settime(timer, 1000);
-	fifo8_init(&timerfifo2, 8, timerbuf2);
 	timer2 = timer_alloc();
-	timer_init(timer2, &timerfifo2, 1);
+	timer_init(timer2, &fifo, 3);
 	timer_settime(timer2, 300);
-	fifo8_init(&timerfifo3, 8, timerbuf3);
 	timer3 = timer_alloc();
-	timer_init(timer3, &timerfifo3, 1);
+	timer_init(timer3, &fifo, 1);
 	timer_settime(timer3, 50);
 	
-
-	//test
-/*	init_screen8(binfo->vram, binfo->scrnx, binfo->scrny); // initialize the show of screen
-	boxfill8(binfo->vram, binfo->scrnx, COL8_0000FF, 0, 0, 79, 15); // hide coordinate
-	putfonts8_asc(binfo->vram, binfo->scrnx, 0, 0, COL8_FFFFFF, "hku"); // show coordinate
-*/
-
-	
 	for (;;) {
-		//count++; // high-speed counting
+		count++; // high-speed counting to test the performance 
 		//sprintf(s, "%010d", count);
-		sprintf(s, "%010d", timerctl.count);
-		boxfill8(buf_win, 160, COL8_C6C6C6, 40, 28, 119, 43);
-		putfonts8_asc(buf_win, 160, 40, 28, COL8_000000, s);
-		sheet_refresh(sht_win, 40, 28, 120, 44);
+		
+		//sprintf(s, "%010d", timerctl.count);
+		//boxfill8(buf_win, 160, COL8_C6C6C6, 40, 28, 119, 43);
+		//putfonts8_asc(buf_win, 160, 40, 28, COL8_000000, s);
+		//sheet_refresh(sht_win, 40, 28, 120, 44);
 	
 		//io_hlt(); // in order to count in a high speed, do not use htl to let CPU sleep
 		io_cli();
-		if (fifo8_status(&keyfifo) + fifo8_status(&mousefifo) + fifo8_status(&timerfifo) + fifo8_status(&timerfifo2) + fifo8_status(&timerfifo3) == 0) {
+		if (fifo32_status(&fifo) == 0) {
 			//io_stihlt();
 			io_sti();
 		} else {
-			if(fifo8_status(&keyfifo) != 0) {
-				i = fifo8_get(&keyfifo);
-				io_sti();
-				sprintf(s, "%02X", i);
-				boxfill8(buf_back, binfo->scrnx, COL8_0000FF, 0, 16, 15, 31);
-				putfonts8_asc(buf_back, binfo->scrnx, 0, 16, COL8_FFFFFF, s);
-				sheet_refresh(sht_back, 0, 16, 16, 32);
-			} else if (fifo8_status(&mousefifo) != 0) {				
-				i = fifo8_get(&mousefifo);
-				io_sti();
-				if (mouse_decode(&mdec, i) != 0) {
-				
+			i = fifo32_get(&fifo);
+			io_sti();
+			if (256 <= i && i <= 511) { // keyboard data
+				sprintf(s, "%02X", i - 256);
+				putfonts8_asc_sht(sht_back, 0, 16, COL8_FFFFFF, COL8_0000FF, s, 2);
+			} else if (512 <= i && i <= 767) { // mouse data
+				if (mouse_decode(&mdec, i - 512) != 0) {
+					// there are three bytes that have been received, so showing them
 					sprintf(s, "[lcr %4d %4d]", mdec.x, mdec.y);
 					if ((mdec.btn & 0x01) != 0) {
 						s[1] = 'L';
@@ -140,9 +126,8 @@ void HariMain(void)
 					if ((mdec.btn & 0x04) != 0) {
 						s[2] = 'C';
 					}
-					boxfill8(buf_back, binfo->scrnx, COL8_0000FF, 32, 16, 32 + 15 * 8 - 1, 31);
-					putfonts8_asc(buf_back, binfo->scrnx, 32, 16, COL8_FFFFFF, s);
-					sheet_refresh(sht_back, 32, 16, 32 + 15 * 8, 32);
+
+					putfonts8_asc_sht(sht_back, 32, 16, COL8_FFFFFF, COL8_0000FF, s, 15);
 					
 					// move mouse cursor
 					mx += mdec.x;
@@ -154,13 +139,6 @@ void HariMain(void)
 						my = 0;
 					}
 					
-					//if (mx > binfo->scrnx - 16) {
-					//	mx = binfo->scrnx - 16;
-					//}
-					//if (my > binfo->scrny - 16) {
-					//	my = binfo->scrny - 16;
-					//}
-					
 					// when mouse moves out of the screen, it could be hidden
 					if (mx > binfo->scrnx - 1) {
 						mx = binfo->scrnx - 1;
@@ -170,36 +148,28 @@ void HariMain(void)
 					}
 					
 					sprintf(s, "(%3d, %3d)", mx, my);
-					boxfill8(buf_back, binfo->scrnx, COL8_0000FF, 0, 0, 79, 15); // hide coordinate
-					putfonts8_asc(buf_back, binfo->scrnx, 0, 0, COL8_FFFFFF, s);  // show coordinate
-					sheet_refresh(sht_back, 0, 0, 80, 16);
+					putfonts8_asc_sht(sht_back, 0, 0, COL8_FFFFFF, COL8_0000FF, s, 15);
 					sheet_slide(sht_mouse, mx, my);
 				}
-			} else if (fifo8_status(&timerfifo) != 0) {
-				i = fifo8_get(&timerfifo);
-				io_sti();
-				putfonts8_asc(buf_back, binfo->scrnx, 0, 84, COL8_FFFFFF, "10[sec]");
-				sheet_refresh(sht_back, 0, 84, 56, 100);
-				
-			} else if (fifo8_status(&timerfifo2) != 0) {
-				i = fifo8_get(&timerfifo2);
-				io_sti();
-				putfonts8_asc(buf_back, binfo->scrnx, 0, 104, COL8_FFFFFF, "3[sec]");
-				sheet_refresh(sht_back, 0, 104, 56, 120);
-				
-			} else if (fifo8_status(&timerfifo3) != 0) { // simulate cursor
-				i = fifo8_get(&timerfifo3);
-				io_sti();
-				// flickering effects
-				if (i != 0) {
-					timer_init(timer3, &timerfifo3, 0); // set 0
-					boxfill8(buf_back, binfo->scrnx, COL8_FFFFFF, 8, 124, 15, 140);
-				} else {
-					timer_init(timer3, &timerfifo3, 1); // set 1
-					boxfill8(buf_back, binfo->scrnx, COL8_0000FF, 8, 124, 15, 140);
-				}
+			} else if (i == 10) { // the 10-second timer
+				putfonts8_asc_sht(sht_back, 0, 84, COL8_FFFFFF, COL8_0000FF, "10[sec]", 7);
+				// testing the performance, showing the value of count after 10 seconds
+				sprintf(s, "%010d", count);
+				putfonts8_asc_sht(sht_win, 40, 28, COL8_000000, COL8_C6C6C6, s, 10);	
+			} else if (i == 3) { // the 3-second timer
+				putfonts8_asc_sht(sht_back, 0, 104, COL8_FFFFFF, COL8_0000FF, "3[sec]", 7);
+				count = 0; 	// for testing the performance, after 3 seconds, start testing, because the initialization needs some time, 
+							// we do the count after initialization to decrease error.
+			} else if (i == 1) { // the cursor timer
+				timer_init(timer3, &fifo, 0);
+				boxfill8(buf_back, binfo->scrnx, COL8_FFFFFF, 8, 124, 15, 143);
 				timer_settime(timer3, 50);
-				sheet_refresh(sht_back, 8, 124, 16, 141);
+				sheet_refresh(sht_back, 8, 124, 16, 144);
+			} else if (i == 0) { // the cursor timer
+				timer_init(timer3, &fifo, 1);
+				boxfill8(buf_back, binfo->scrnx, COL8_0000FF, 8, 124, 15, 143);
+				timer_settime(timer3, 50);
+				sheet_refresh(sht_back, 8, 124, 16, 144);
 			}
 		}
 	}
@@ -252,5 +222,13 @@ void make_window8(unsigned char *buf, int xsize, int ysize, char *title)
 			buf[(5 + y) * xsize + (xsize - 21 + x)] = c;
 		}
 	}
+	return;
+}
+
+void putfonts8_asc_sht(struct SHEET *sht, int x, int y, int c, int b, char *s, int l)
+{
+	boxfill8(sht->buf, sht->bxsize, b, x, y, x + l * 8 - 1, y + 15); // paint background color
+	putfonts8_asc(sht->buf, sht->bxsize, x, y, c, s); // write characters
+	sheet_refresh(sht, x, y, x + l * 8, y + 16);
 	return;
 }

@@ -1,36 +1,35 @@
 #include "bootpack.h"
 
-struct FIFO8 mousefifo;
+struct FIFO32 *mousefifo;
+int mousedata0;
 
 void inthandler2c(int *esp)
 /* PS/2 mouse */
 {
-	/*struct BOOTINFO *binfo = (struct BOOTINFO *) ADR_BOOTINFO;
-	boxfill8(binfo->vram, binfo->scrnx, COL8_000000, 0, 0, 32 * 8 - 1, 15);
-	putfonts8_asc(binfo->vram, binfo->scrnx, 0, 0, COL8_FFFFFF, "INT 2C (IRQ-12) : PS/2 mouse");
-	for (;;) {
-		io_hlt();
-	}*/
-	unsigned char data;
-	io_out8(PIC1_OCW2, 0x64);
-	io_out8(PIC0_OCW2, 0x62); //inform master PIC
+	int data;
+	io_out8(PIC1_OCW2, 0x64); // inform the information which IRQ-12 has finished receiving signal to PIC1
+	io_out8(PIC0_OCW2, 0x62); //inform the information which IRQ-02 has finished receiving signal to PIC0
 	data = io_in8(PORT_KEYDAT);
-	fifo8_put(&mousefifo, data);
+	fifo32_put(mousefifo, data + mousedata0);
 	return;
 }
 
 #define KEYCMD_SENDTO_MOUSE		0xd4
 #define MOUSECMD_ENABLE			0xf4
 
-void enable_mouse(struct MOUSE_DEC *mdec)
+void enable_mouse(struct FIFO32 *fifo, int data0, struct MOUSE_DEC *mdec)
 {
+	// the information of FIFO is saved in global variables
+	mousefifo = fifo;
+	mousedata0 = data0;
+	
 	/* activate mouse */
 	wait_KBC_sendready();
 	io_out8(PORT_KEYCMD, KEYCMD_SENDTO_MOUSE);
 	wait_KBC_sendready();
 	io_out8(PORT_KEYDAT, MOUSECMD_ENABLE);
-	
-	mdec->phase = 0; // waiting for mouse
+	// if things go well, ACK(0xfa) will be sent
+	mdec->phase = 0; // waiting for mouse's 0xfa
 	return;
 }
 

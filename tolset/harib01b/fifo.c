@@ -1,20 +1,20 @@
 #include "bootpack.h"
 
-void fifo8_init(struct FIFO8 *fifo, int size, unsigned char *buf)
+void fifo32_init(struct FIFO32 *fifo, int size, int *buf)
 /* initialize FIFO buffer */
 {
 	fifo->size = size;
 	fifo->buf = buf;
 	fifo->free = size;
 	fifo->flags = 0;
-	fifo->p = 0;
-	fifo->q = 0;
+	fifo->p = 0; // the position of write
+	fifo->q = 0; // the position of read
 	return;
 }
 
 #define FLAGS_OVERRUN	0x0001
 
-int fifo8_put(struct FIFO8 *fifo, unsigned char data)
+int fifo32_put(struct FIFO32 *fifo, int data)
 /* send data to FIFO and saving */
 {
 	if (fifo->free == 0) {
@@ -31,10 +31,12 @@ int fifo8_put(struct FIFO8 *fifo, unsigned char data)
 	return 0;
 }
 
-int fifo8_get(struct FIFO8 *fifo)
+int fifo32_get(struct FIFO32 *fifo)
+// get a data from FIFO
 {
 	int data;
 	if (fifo->free == fifo->size) {
+		// when the fifo is empty, return -1
 		return -1;
 	}
 	data = fifo->buf[fifo->q];
@@ -46,7 +48,8 @@ int fifo8_get(struct FIFO8 *fifo)
 	return data;
 }
 
-int fifo8_status(struct FIFO8 *fifo)
+int fifo32_status(struct FIFO32 *fifo)
+// report that how much data has been stored
 {
 	return fifo->size - fifo->free;
 }
