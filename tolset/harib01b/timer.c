@@ -6,19 +6,25 @@
 struct TIMERCTL timerctl;
 
 // the interrupt of IRQ0
+// add sentry
 void init_pit(void)
 {
 	int i;
+	struct TIMER *t;
 	io_out8(PIT_CTRL, 0x34);
 	//0x2e9c indicates that the frequency of interrupt is 100HZ
 	io_out8(PIT_CNT0, 0x9c); // lower eight bits of interrupt cycle
 	io_out8(PIT_CNT0, 0x2e); // higher eight bits of interrupt cycle
 	timerctl.count = 0;
-	timerctl.next = 0xffffffff;
-	timerctl.using = 0;
 	for (i = 0; i < MAX_TIMER; i++) {
 		timerctl.timers0[i].flags = 0;
 	}
+	t = timer_alloc(); // get one
+	t->timeout = 0xffffffff;
+	t->flags = TIMER_FLAGS_USING;
+	t->next = 0; // sentry is always at the end
+	timerctl.t0 = t; // because now there is only sentry, so put it on the front
+	timerctl.next = 0xffffffff; // also because there is only sentry, so the next timeout is from sentry
 	return;
 }
 
@@ -47,59 +53,82 @@ void timer_init(struct TIMER *timer, struct FIFO32 *fifo, int data)
 	return;
 }
 
+// set a timer's timeout, need forbid interrupt
 void timer_settime(struct TIMER *timer, unsigned int timeout)
 {
-	int e, i, j;
+	int e;
+	struct TIMER *t, *s;
 	timer->timeout = timeout + timerctl.count;
 	timer->flags = TIMER_FLAGS_USING;
 	e = io_load_eflags();
-	io_cli();
+	io_cli(); // forbid interrupt
 	
-	for (i = 0; i < timerctl.using; i++) {
-		if (timerctl.timers[i]->timeout >= timer->timeout) {
-			break;
+	/*
+	if (timerctl.using == 1) {
+		// there is only one timer running, but when using sentry, the case does not exist any more
+		timerctl.t0 = timer;
+		timer->next = 0; // no next timer
+		timerctl.next = timer->timeout;
+		io_store_eflags(e);
+		return;
+	}*/ 
+	t = timerctl.t0;
+	if (timer->timeout <= t->timeout) {
+		// put the timer to timerctl.timers[0]
+		timerctl.t0 = timer;
+		timer->next = t;
+		timerctl.next = timer->timeout;
+		io_store_eflags(e);
+		return;
+	}
+	// find where to insert
+	for (;;) {
+		s = t;
+		t = t->next;
+		//if (t == 0) {
+		//	break; // the end, but when using sentry, the case does not exist any more
+		//}
+		
+		if (timer->timeout <= t->timeout) {
+			// insert between s and t
+			s->next = timer;
+			timer->next = t;
+			io_store_eflags(e);
+			return;
 		}
 	}
-
-	for (j = timerctl.using; j > i; j--) {
-		timerctl.timers[j] = timerctl.timers[j - 1];
-	}
-	timerctl.using++;
-
-	timerctl.timers[i] = timer;
-	timerctl.next = timerctl.timers[0]->timeout;
-	io_store_eflags(e);
+	// in the case that insert into the end
+	//s->next = timer;
+	//timer->next = 0;
+	//io_store_eflags(e);
 	return;
+	
 }
 
 // when IRQ0(timer interrupt) happens, invoke the interrupt handler: inthandler20
 void inthandler20(int *esp)
 {
-	int i, j;
+	int i;
+	struct TIMER *timer;
 	io_out8(PIC0_OCW2, 0x60); // Inform PIC the information that IRQ0-00 has been received.
 	timerctl.count++; // each second it adds 100
 	if (timerctl.next > timerctl.count) {
 		return; // the next time has not arrived, so finish
 	}
-	// checking in all of the timers which are being used, which timer time out.
+	timer = timerctl.t0; // first, put the first address in timers to timer
 	// now we do not have to do MAX_TIMER times of 'if'
-	for (i = 0; i < timerctl.using; i++) {
-		if (timerctl.timers[i]->timeout > timerctl.count) {
+	for (;;) {
+		if (timer->timeout > timerctl.count) {
 			break;
 		}
 		// timeout
-		timerctl.timers[i]->flags = TIMER_FLAGS_ALLOC;
-		fifo32_put(timerctl.timers[i]->fifo, timerctl.timers[i]->data);
+		timer->flags = TIMER_FLAGS_ALLOC;
+		fifo32_put(timer->fifo, timer->data);
+		timer = timer->next;
 	}
-	// a timer has timed out, we need shift the rest using timer
-	timerctl.using -= i;
-	for (j = 0; j < timerctl.using; j++) {
-		timerctl.timers[j] = timerctl.timers[i + j];
-	}
-	if (timerctl.using > 0) {
-		timerctl.next = timerctl.timers[0]->timeout;
-	} else {
-		timerctl.next = 0xffffffff;
-	}
+
+	// we do not have to do shift due to timer->next
+	timerctl.t0 = timer;
+	timerctl.next = timerctl.t0->timeout;
 	return;
 }

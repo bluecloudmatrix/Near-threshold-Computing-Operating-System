@@ -177,13 +177,14 @@ void sheet_free(struct SHEET *sht);
 
 #define MAX_TIMER		500
 struct TIMER {
+	struct TIMER *next; // next points to the address of next timer which is going to timeout
 	unsigned int timeout, flags; // flags is used to record the status of the timer
 	struct FIFO32 *fifo;
 	int data;
 };
 struct TIMERCTL {
 	unsigned int count, next, using;
-	struct TIMER *timers[MAX_TIMER]; // the address of timers which have been arranged in some kind of order
+	struct TIMER *t0; // the address of timers which have been arranged in some kind of order
 	struct TIMER timers0[MAX_TIMER]; // the entity of MAX_TIMER timers
 };
 extern struct TIMERCTL timerctl;
