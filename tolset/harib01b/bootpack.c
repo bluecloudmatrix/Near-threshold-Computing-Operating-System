@@ -94,7 +94,7 @@ void HariMain(void)
 	timer_settime(timer3, 50);
 	
 	for (;;) {
-		count++; // high-speed counting to test the performance 
+		//count++; // high-speed counting to test the performance 
 		//sprintf(s, "%010d", count);
 		
 		//sprintf(s, "%010d", timerctl.count);
@@ -105,14 +105,17 @@ void HariMain(void)
 		//io_hlt(); // in order to count in a high speed, do not use htl to let CPU sleep
 		io_cli();
 		if (fifo32_status(&fifo) == 0) {
-			//io_stihlt();
-			io_sti();
+			io_stihlt();
+			//io_sti();
 		} else {
 			i = fifo32_get(&fifo);
 			io_sti();
 			if (256 <= i && i <= 511) { // keyboard data
 				sprintf(s, "%02X", i - 256);
 				putfonts8_asc_sht(sht_back, 0, 16, COL8_FFFFFF, COL8_0000FF, s, 2);
+				if (i == 0x1e + 256) {
+					putfonts8_asc_sht(sht_win, 40, 28, COL8_000000, COL8_C6C6C6, "A", 1);	
+				}
 			} else if (512 <= i && i <= 767) { // mouse data
 				if (mouse_decode(&mdec, i - 512) != 0) {
 					// there are three bytes that have been received, so showing them
@@ -154,11 +157,11 @@ void HariMain(void)
 			} else if (i == 10) { // the 10-second timer
 				putfonts8_asc_sht(sht_back, 0, 84, COL8_FFFFFF, COL8_0000FF, "10[sec]", 7);
 				// testing the performance, showing the value of count after 10 seconds
-				sprintf(s, "%010d", count);
-				putfonts8_asc_sht(sht_win, 40, 28, COL8_000000, COL8_C6C6C6, s, 10);	
+				//sprintf(s, "%010d", count);
+				//putfonts8_asc_sht(sht_win, 40, 28, COL8_000000, COL8_C6C6C6, s, 10);	
 			} else if (i == 3) { // the 3-second timer
 				putfonts8_asc_sht(sht_back, 0, 104, COL8_FFFFFF, COL8_0000FF, "3[sec]", 7);
-				count = 0; 	// for testing the performance, after 3 seconds, start testing, because the initialization needs some time, 
+				//count = 0; 	// for testing the performance, after 3 seconds, start testing, because the initialization needs some time, 
 							// we do the count after initialization to decrease error.
 			} else if (i == 1) { // the cursor timer
 				timer_init(timer3, &fifo, 0);
