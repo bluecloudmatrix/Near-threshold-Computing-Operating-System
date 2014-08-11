@@ -12,8 +12,8 @@
 		GLOBAL	_io_load_eflags, _io_store_eflags
 		GLOBAL	_load_gdtr, _load_idtr
 		GLOBAL	_asm_inthandler20, _asm_inthandler21, _asm_inthandler2c, _asm_inthandler27
-		GLOBAL	_load_cr0, _store_cr0
-		GLOBAL  _memtest_sub
+		GLOBAL	_load_cr0, _load_tr, _store_cr0
+		GLOBAL  _memtest_sub, _taskswitch4
 		EXTERN	_inthandler20, _inthandler21, _inthandler2c, _inthandler27
 		
 [SECTION .text]
@@ -161,6 +161,10 @@ _load_cr0:
 		MOV		EAX, CR0
 		RET
 		
+_load_tr:
+		LTR		[ESP+4]
+		RET
+		
 _store_cr0:
 		MOV		EAX, [ESP+4]
 		MOV		CR0, EAX
@@ -199,4 +203,6 @@ mts_fin:
 		POP		EDI
 		RET
 
-		
+_taskswitch4:
+		JMP		4*8:0
+		RET
