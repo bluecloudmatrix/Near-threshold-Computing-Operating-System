@@ -1,3 +1,8 @@
+/*
+ * COL8_0000FF: blue
+ *
+ */
+
 #include <stdio.h>
 #include "bootpack.h"
 
@@ -14,7 +19,7 @@ struct TSS32 {
 	int ldtr, iomap;
 };
 
-void task_b_main(void);
+void task_b_main(struct SHEET *sht_back);
 
 void HariMain(void)
 {
@@ -23,7 +28,7 @@ void HariMain(void)
 	struct FIFO32 fifo; // shared FIFO buffer
 	int fifobuf[128];
 	char s[40];
-	struct TIMER *timer, *timer2, *timer3;
+	struct TIMER *timer, *timer2, *timer3, *timer_ts;
 	int mx, my, i;
 	struct MOUSE_DEC mdec;
 	unsigned int memtotal, count = 0;
@@ -113,6 +118,10 @@ void HariMain(void)
 	timer_init(timer3, &fifo, 1);
 	timer_settime(timer3, 50);
 	
+	timer_ts = timer_alloc();
+	timer_init(timer_ts, &fifo, 2);
+	timer_settime(timer_ts, 2); // 0.02s
+	
 	tss_a.ldtr = 0;
 	tss_a.iomap = 0x40000000;
 	tss_b.ldtr = 0;
@@ -122,7 +131,7 @@ void HariMain(void)
 	load_tr(3 * 8);
 	//prepare tss_b for task switching to tss_b
 	int task_b_esp;
-	task_b_esp = memman_alloc_4k(memman, 64 * 1024) + 64 * 1024; // 64KB allocated for task B
+	task_b_esp = memman_alloc_4k(memman, 64 * 1024) + 64 * 1024 - 8; // 64KB allocated for task B
 	tss_b.eip = (int) &task_b_main;
 	tss_b.eflags = 0x00000202; // IF = 1
 	tss_b.eax = 0;
@@ -139,6 +148,10 @@ void HariMain(void)
 	tss_b.ds = 1 * 8;
 	tss_b.fs = 1 * 8;
 	tss_b.gs = 1 * 8;
+	*((int *) (task_b_esp + 4)) = (int) sht_back;
+	
+	// transmit sht_back to task B
+	//*((int *)0x0fec) = (int) sht_back;
 	
 	for (;;) {
 		//count++; // high-speed counting to test the performance 
@@ -157,7 +170,10 @@ void HariMain(void)
 		} else {
 			i = fifo32_get(&fifo);
 			io_sti();
-			if (256 <= i && i <= 511) { // keyboard data
+			if (i == 2) {
+				farjmp(0, 4 * 8);
+				timer_settime(timer_ts, 2);
+			} else if (256 <= i && i <= 511) { // keyboard data
 				sprintf(s, "%02X", i - 256);
 				putfonts8_asc_sht(sht_back, 0, 16, COL8_FFFFFF, COL8_0000FF, s, 2);
 				if (i < 256 + 0x54) {
@@ -224,7 +240,7 @@ void HariMain(void)
 				// testing the performance, showing the value of count after 10 seconds
 				//sprintf(s, "%010d", count);
 				//putfonts8_asc_sht(sht_win, 40, 28, COL8_000000, COL8_C6C6C6, s, 10);	
-				taskswitch4();
+				//taskswitch4();
 			} else if (i == 3) { // the 3-second timer
 				putfonts8_asc_sht(sht_back, 0, 104, COL8_FFFFFF, COL8_0000FF, "3[sec]", 7);
 				//count = 0; 	// for testing the performance, after 3 seconds, start testing, because the initialization needs some time, 
@@ -318,7 +334,39 @@ void make_textbox8(struct SHEET *sht, int x0, int y0, int sx, int sy, int c)
 	return;
 }
 
-void task_b_main(void)
+void task_b_main(struct SHEET *sht_back)
 {
-	for (;;) { io_hlt(); }
+	//for (;;) { io_hlt(); }
+	struct FIFO32 fifo;
+	struct TIMER *timer_ts, *timer_put;
+	int i, fifobuf[128], count = 0;
+	char s[11];
+
+	fifo32_init(&fifo, 128, fifobuf);
+	timer_ts = timer_alloc();
+	timer_init(timer_ts, &fifo, 2);
+	timer_settime(timer_ts, 2);
+	timer_put = timer_alloc();
+	timer_init(timer_put, &fifo, 1);
+	timer_settime(timer_put, 1);
+	
+	for (;;) {
+		count++;
+		io_cli();
+		if (fifo32_status(&fifo) == 0) {
+			//io_stihlt();
+			io_sti();
+		} else {
+			i = fifo32_get(&fifo);
+			io_sti();
+			if (i == 1) { // each 0.01s refreshing the screen, not each count++, enhancing the performance
+				sprintf(s, "%11d", count);
+				putfonts8_asc_sht(sht_back, 0, 144, COL8_FFFFFF, COL8_0000FF, s, 11);
+				timer_settime(timer_put, 1);
+			} else if (i == 2) {
+				farjmp(0, 3 * 8);
+				timer_settime(timer_ts, 2);
+			}
+		}
+	}
 }
