@@ -153,6 +153,9 @@ void HariMain(void)
 	// transmit sht_back to task B
 	//*((int *)0x0fec) = (int) sht_back;
 	
+	mt_init();
+	
+	
 	for (;;) {
 		//count++; // high-speed counting to test the performance 
 		//sprintf(s, "%010d", count);
@@ -170,10 +173,7 @@ void HariMain(void)
 		} else {
 			i = fifo32_get(&fifo);
 			io_sti();
-			if (i == 2) {
-				farjmp(0, 4 * 8);
-				timer_settime(timer_ts, 2);
-			} else if (256 <= i && i <= 511) { // keyboard data
+			if (256 <= i && i <= 511) { // keyboard data
 				sprintf(s, "%02X", i - 256);
 				putfonts8_asc_sht(sht_back, 0, 16, COL8_FFFFFF, COL8_0000FF, s, 2);
 				if (i < 256 + 0x54) {
@@ -338,17 +338,17 @@ void task_b_main(struct SHEET *sht_back)
 {
 	//for (;;) { io_hlt(); }
 	struct FIFO32 fifo;
-	struct TIMER *timer_ts, *timer_put;
-	int i, fifobuf[128], count = 0;
-	char s[11];
+	struct TIMER *timer_ls, *timer_put;
+	int i, fifobuf[128], count = 0, count0 = 0;
+	char s[12];
 
 	fifo32_init(&fifo, 128, fifobuf);
-	timer_ts = timer_alloc();
-	timer_init(timer_ts, &fifo, 2);
-	timer_settime(timer_ts, 2);
 	timer_put = timer_alloc();
 	timer_init(timer_put, &fifo, 1);
 	timer_settime(timer_put, 1);
+	timer_ls = timer_alloc();
+	timer_init(timer_ls, &fifo, 100);
+	timer_settime(timer_ls, 100);
 	
 	for (;;) {
 		count++;
@@ -363,9 +363,11 @@ void task_b_main(struct SHEET *sht_back)
 				sprintf(s, "%11d", count);
 				putfonts8_asc_sht(sht_back, 0, 144, COL8_FFFFFF, COL8_0000FF, s, 11);
 				timer_settime(timer_put, 1);
-			} else if (i == 2) {
-				farjmp(0, 3 * 8);
-				timer_settime(timer_ts, 2);
+			} else if (i == 100) {
+				sprintf(s, "%11d", count - count0);
+				putfonts8_asc_sht(sht_back, 0, 128, COL8_FFFFFF, COL8_0000FF, s, 11);
+				count0 = count;
+				timer_settime(timer_ls, 100);
 			}
 		}
 	}

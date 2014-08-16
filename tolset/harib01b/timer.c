@@ -110,6 +110,7 @@ void inthandler20(int *esp)
 {
 	int i;
 	struct TIMER *timer;
+	char ts = 0;
 	io_out8(PIC0_OCW2, 0x60); // Inform PIC the information that IRQ0-00 has been received.
 	timerctl.count++; // each second it adds 100
 	if (timerctl.next > timerctl.count) {
@@ -123,12 +124,19 @@ void inthandler20(int *esp)
 		}
 		// timeout
 		timer->flags = TIMER_FLAGS_ALLOC;
-		fifo32_put(timer->fifo, timer->data);
+		if (timer != mt_timer) {
+			fifo32_put(timer->fifo, timer->data);
+		} else {
+			ts = 1; // mt_timer timeout
+		}
 		timer = timer->next;
 	}
 
 	// we do not have to do shift due to timer->next
 	timerctl.t0 = timer;
 	timerctl.next = timerctl.t0->timeout;
+	if (ts != 0) {
+		mt_taskswitch(); // when the interrupt handling finishes, executing mt_taskswitch
+	}
 	return;
 }
