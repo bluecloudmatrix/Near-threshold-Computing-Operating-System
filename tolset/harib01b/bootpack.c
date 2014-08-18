@@ -12,12 +12,6 @@ void make_window8(unsigned char *buf, int xsize, int ysize, char *title);
 void putfonts8_asc_sht(struct SHEET *sht, int x, int y, int c, int b, char *s, int l);
 void make_textbox8(struct SHEET *sht, int x0, int y0, int sx, int sy, int c);
 
-struct TSS32 {
-	int backlink, esp0, ss0, esp1, ss1, esp2, ss2, cr3;
-	int eip, eflags, eax, ecx, edx, ebx, esp, ebp, esi, edi;
-	int es, cs, ss, ds, fs, gs;
-	int ldtr, iomap;
-};
 
 void task_b_main(struct SHEET *sht_back);
 
@@ -47,6 +41,8 @@ void HariMain(void)
 	int cursor_x, cursor_c;
 	struct TSS32 tss_a, tss_b;
 	struct SEGMENT_DESCRIPTOR *gdt = (struct SEGMENT_DESCRIPTOR *) ADR_GDT;
+	struct TASK *task_b;
+	
 	
 	// interrupt setting
 	init_gdtidt();
@@ -153,8 +149,19 @@ void HariMain(void)
 	// transmit sht_back to task B
 	//*((int *)0x0fec) = (int) sht_back;
 	
-	mt_init();
-	
+	//mt_init();
+	task_init(memman);
+	task_b = task_alloc();
+	task_b->tss.esp = memman_alloc_4k(memman, 64 * 1024) + 64 * 1024 - 8;
+	task_b->tss.eip = (int) &task_b_main;
+	task_b->tss.es = 1 * 8;
+	task_b->tss.cs = 2 * 8;
+	task_b->tss.ss = 1 * 8;
+	task_b->tss.ds = 1 * 8;
+	task_b->tss.fs = 1 * 8;
+	task_b->tss.gs = 1 * 8;
+	*((int *) (task_b->tss.esp + 4)) = (int) sht_back;
+	task_run(task_b);
 	
 	for (;;) {
 		//count++; // high-speed counting to test the performance 
