@@ -41,7 +41,7 @@ void HariMain(void)
 	int cursor_x, cursor_c;
 	struct TSS32 tss_a, tss_b;
 	struct SEGMENT_DESCRIPTOR *gdt = (struct SEGMENT_DESCRIPTOR *) ADR_GDT;
-	struct TASK *task_b;
+	struct TASK *task_a, *task_b;
 	
 	
 	// interrupt setting
@@ -51,7 +51,7 @@ void HariMain(void)
 	init_pit(); // about timer
 	
 	// shared FIFO buffer setting
-	fifo32_init(&fifo, 128, fifobuf);            // used for receiving interrupt information
+	fifo32_init(&fifo, 128, fifobuf, 0);            // used for receiving interrupt information
 	init_keyboard(&fifo, 256);	
 	enable_mouse(&fifo, 512, &mdec);
 	io_out8(PIC0_IMR, 0xf8); // PIT and PIC1 and keyboard are set to permission: 11111000
@@ -102,7 +102,7 @@ void HariMain(void)
 	sheet_updown(sht_win, 1);
 	
 	sheet_refresh(sht_back, 0, 0, binfo->scrnx, 80);  // show the vram
-
+	
 	// timer buf
 	timer = timer_alloc();
 	timer_init(timer, &fifo, 10);
@@ -150,7 +150,8 @@ void HariMain(void)
 	//*((int *)0x0fec) = (int) sht_back;
 	
 	//mt_init();
-	task_init(memman);
+	task_a = task_init(memman);
+	fifo.task = task_a;
 	task_b = task_alloc();
 	task_b->tss.esp = memman_alloc_4k(memman, 64 * 1024) + 64 * 1024 - 8;
 	task_b->tss.eip = (int) &task_b_main;
@@ -162,6 +163,8 @@ void HariMain(void)
 	task_b->tss.gs = 1 * 8;
 	*((int *) (task_b->tss.esp + 4)) = (int) sht_back;
 	task_run(task_b);
+	
+	
 	
 	for (;;) {
 		//count++; // high-speed counting to test the performance 
@@ -175,8 +178,9 @@ void HariMain(void)
 		//io_hlt(); // in order to count in a high speed, do not use htl to let CPU sleep
 		io_cli();
 		if (fifo32_status(&fifo) == 0) {
-			io_stihlt();
-			//io_sti();
+			//io_stihlt();
+			task_sleep(task_a);
+			io_sti();
 		} else {
 			i = fifo32_get(&fifo);
 			io_sti();
@@ -349,7 +353,7 @@ void task_b_main(struct SHEET *sht_back)
 	int i, fifobuf[128], count = 0, count0 = 0;
 	char s[12];
 
-	fifo32_init(&fifo, 128, fifobuf);
+	fifo32_init(&fifo, 128, fifobuf, 0);
 	timer_put = timer_alloc();
 	timer_init(timer_put, &fifo, 1);
 	timer_settime(timer_put, 1);
