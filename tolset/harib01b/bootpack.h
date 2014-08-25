@@ -201,6 +201,9 @@ void inthandler20(int *esp);
 #define MAX_TASKS	1000 // the maximum number of tasks
 #define TASK_GDT0	3	 // start with which index of GDT, and assigned to TSS
 
+#define MAX_TASKS_LV	1000
+#define MAX_TASKLEVELS	10
+
 struct TSS32 {
 	int backlink, esp0, ss0, esp1, ss1, esp2, ss2, cr3;
 	int eip, eflags, eax, ecx, edx, ebx, esp, ebp, esi, edi;
@@ -210,8 +213,22 @@ struct TSS32 {
 
 struct TASK {
 	int sel, flags; // sel is used to save the index of GDT
+	int priority;
 	struct TSS32 tss;
 };
+
+/*struct TASKLEVEL {
+	int running; // showing the number of running tasks
+	int now; // which task is running
+	struct TASK * tasks[MAX_TASKS_LV];
+};*/
+
+/*struct TASKCTL {
+	int now_lv; // which level is in action
+	char lv_change; // whether need to change LEVEL in the next time task switching
+	struct TASKLEVEL level[MAX_TASKLEVELS];
+	struct TASK tasks0[MAX_TASKS];
+};*/
 
 struct TASKCTL {
 	int running; // the number of running tasks
@@ -223,6 +240,6 @@ struct TASKCTL {
 extern struct TIMER *task_timer;
 struct TASK *task_init(struct MEMMAN *memman);
 struct TASK *task_alloc(void);
-void task_run(struct TASK *task);
+void task_run(struct TASK *task, int priority);
 void task_switch(void);
 void task_sleep(struct TASK *task);

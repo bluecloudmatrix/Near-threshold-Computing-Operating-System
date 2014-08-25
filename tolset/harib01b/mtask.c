@@ -73,34 +73,43 @@ struct TASK *task_init(struct MEMMAN *memman)
 	}
 	task = task_alloc();
 	task->flags = 2; // running
+	task->priority = 2; // 0.02 seconds
 	taskctl->running = 1;
 	taskctl->now = 0;
 	taskctl->tasks[0] = task;
 	load_tr(task->sel);
 	task_timer = timer_alloc();
-	timer_settime(task_timer, 2);
+	timer_settime(task_timer, task->priority);
 	return task;
 }
 
 // add task to the end of tasks, and then let running add 1
-void task_run(struct TASK *task)
+void task_run(struct TASK *task, int priority)
 {
-	task->flags = 2; // running
-	taskctl->tasks[taskctl->running] = task;
-	taskctl->running++;
+	// when priority is set to 0, not change the priority, the case is when waking up the sleep task
+	if (priority > 0) {
+		task->priority = priority;
+	}
+	if (task->flags != 2) {
+		task->flags = 2; // running
+		taskctl->tasks[taskctl->running] = task;
+		taskctl->running++;
+	}
 	return;
 }
 
 // the scheduling policy is RR
 void task_switch(void)
 {
-	timer_settime(task_timer, 2);
+	struct TASK *task;
+	taskctl->now++;
+	if (taskctl->now == taskctl->running) {
+		taskctl->now = 0;
+	}
+	task = taskctl->tasks[taskctl->now];
+	timer_settime(task_timer, task->priority);
 	if (taskctl->running >= 2) {
-		taskctl->now++;
-		if (taskctl->now == taskctl->running) {
-			taskctl->now = 0;
-		}
-		farjmp(0, taskctl->tasks[taskctl->now]->sel);
+		farjmp(0, task->sel);
 	}
 	return;
 }
