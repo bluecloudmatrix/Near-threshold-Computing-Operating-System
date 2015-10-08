@@ -214,6 +214,7 @@ struct TSS32 {
 struct TASK {
 	int sel, flags; // sel is used to save the index of GDT
 	int priority;
+	struct FIFO32 fifo;
 	struct TSS32 tss;
 };
 

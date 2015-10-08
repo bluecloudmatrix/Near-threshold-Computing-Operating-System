@@ -157,19 +157,29 @@ void HariMain(void)
 			if (256 <= i && i <= 511) { // keyboard data
 				sprintf(s, "%02X", i - 256);
 				putfonts8_asc_sht(sht_back, 0, 16, COL8_FFFFFF, COL8_0000FF, s, 2);
-				if (i < 256 + 0x54) {
-					if (keytable[i - 256] != 0 && cursor_x < 144) { // common characters
-						// show a character, and then move the cursor 
-						s[0] = keytable[i - 256];
-						s[1] = 0;
-						putfonts8_asc_sht(sht_win, cursor_x, 28, COL8_000000, COL8_FFFFFF, s, 1);
-						cursor_x += 8;
-					}					
+				if (i < 256 + 0x54 && keytable[i - 256] != 0) {  // common characters
+					if (key_to == 0) { // to task A
+						if (cursor_x < 128) {
+							// show a character, and then move the cursor 
+							s[0] = keytable[i - 256];
+							s[1] = 0;
+							putfonts8_asc_sht(sht_win, cursor_x, 28, COL8_000000, COL8_FFFFFF, s, 1);
+							cursor_x += 8;
+						}
+					} else { // to Console Window
+						fifo32_put(&task_cons->fifo, keytable[i - 256] + 256);
+					}				
 				}
-				if (i == 256 + 0x0e && cursor_x > 8) { // backspace key
-					// use space key to eliminate cursor, and then backspace the cursor
-					putfonts8_asc_sht(sht_win, cursor_x, 28, COL8_000000, COL8_FFFFFF, " ", 1);
-					cursor_x -= 8;
+				if (i == 256 + 0x0e) { // backspace key
+					if (key_to == 0) { // to TASK A
+						if (cursor_x > 8) {
+							// use space key to eliminate cursor, and then backspace the cursor
+							putfonts8_asc_sht(sht_win, cursor_x, 28, COL8_000000, COL8_FFFFFF, " ", 1);
+							cursor_x -= 8;
+						}
+					} else { // to Console Window
+						fifo32_put(&task_cons->fifo, 8 + 256);
+					}
 				}
 				if (i == 256 + 0x0f) { // tab key
 					if (key_to == 0) {
@@ -366,36 +376,63 @@ void task_b_main(struct SHEET *sht_win_b)
 
 void console_task(struct SHEET *sheet)
 {
-	struct FIFO32 fifo;
+	//struct FIFO32 fifo;
 	struct TIMER *timer;
 	struct TASK *task = task_now();
 	
-	int i, fifobuf[128], cursor_x = 8, cursor_c = COL8_000000;
-	fifo32_init(&fifo, 128, fifobuf, task);
+	int i, fifobuf[128], cursor_x = 16, cursor_c = COL8_000000;
+	
+	char s[2];
+	
+	fifo32_init(&task->fifo, 128, fifobuf, task);
 	timer = timer_alloc();
-	timer_init(timer, &fifo, 1);
+	timer_init(timer, &task->fifo, 1);
 	timer_settime(timer, 50);
 	
+	// show prompt
+	putfonts8_asc_sht(sheet, 8, 28, COL8_FFFFFF, COL8_000000, ">", 1);
+	
 	for (;;) {
-		io_cli();
-		if (fifo32_status(&fifo) == 0) {
+		io_cli(); // close interrupt
+		if (fifo32_status(&task->fifo) == 0) {
 			task_sleep(task);
 			io_sti();
 		} else {
-			i = fifo32_get(&fifo);
-			io_sti();
+			i = fifo32_get(&task->fifo);
+			io_sti(); // open interrupt
+			
 			if (i <= 1) {
 				if (i != 0) {
-					timer_init(timer, &fifo, 0); // next time set 0
+					timer_init(timer, &task->fifo, 0); // next time set 0
 					cursor_c = COL8_FFFFFF;
 				} else {
-					timer_init(timer, &fifo, 1); // next time set 1
+					timer_init(timer, &task->fifo, 1); // next time set 1
 					cursor_c = COL8_000000;
 				}
 				timer_settime(timer, 50);
-				boxfill8(sheet->buf, sheet->bxsize, cursor_c, cursor_x, 28, cursor_x + 7, 43);
-				sheet_refresh(sheet, cursor_x, 28, cursor_x + 8, 44);
+			}	
+			if (256 <= i && i <= 511) { // keyboard data (through TASK A)
+				if (i == 8 + 256) {
+					// backspace key
+					if (cursor_x > 16) {
+						//using white to erase cursor, and then shift it forward
+						putfonts8_asc_sht(sheet, cursor_x, 28, COL8_FFFFFF, COL8_000000, " ", 1);
+						cursor_x -= 8;
+					}
+				} else {
+					// common char
+					if (cursor_x < 240) {
+						// shift the cursor backward after showing a char
+						s[0] = i - 256;
+						s[1] = 0;
+						putfonts8_asc_sht(sheet, cursor_x, 28, COL8_FFFFFF, COL8_000000, s, 1);
+						cursor_x += 8;
+					}
+				}
 			}
+			// re-show cursor
+			boxfill8(sheet->buf, sheet->bxsize, cursor_c, cursor_x, 28, cursor_x + 7, 43);
+			sheet_refresh(sheet, cursor_x, 28, cursor_x + 8, 44);
 		}
 	}
 }
