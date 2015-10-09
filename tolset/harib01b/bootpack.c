@@ -18,6 +18,7 @@ void console_task(struct SHEET *sheet);
 void HariMain(void)
 {
 	int key_to = 0;
+	int key_shift = 0;
 	
 	struct BOOTINFO *binfo = (struct BOOTINFO *) ADR_BOOTINFO;
 	struct FIFO32 fifo;
@@ -30,6 +31,14 @@ void HariMain(void)
 	struct SHTCTL *shtctl;
 	static char keytable[0x54] = {
 		0,   0,   '1', '2', '3', '4', '5', '6', '7', '8', '9', '0', '-', '^', 0,   0,
+		'Q', 'W', 'E', 'R', 'T', 'Y', 'U', 'I', 'O', 'P', '@', '[', 0,   0,   'A', 'S',
+		'D', 'F', 'G', 'H', 'J', 'K', 'L', ';', ':', 0,   0,   ']', 'Z', 'X', 'C', 'V',
+		'B', 'N', 'M', ',', '.', '/', 0,   '*', 0,   ' ', 0,   0,   0,   0,   0,   0,
+		0,   0,   0,   0,   0,   0,   0,   '7', '8', '9', '-', '4', '5', '6', '+', '1',
+		'2', '3', '0', '.'
+	};
+	static char keytable1[0x54] = {
+		0,   0,   '!', '@', '3', '4', '5', '6', '7', '8', '9', '0', '-', '^', 0,   0,
 		'Q', 'W', 'E', 'R', 'T', 'Y', 'U', 'I', 'O', 'P', '@', '[', 0,   0,   'A', 'S',
 		'D', 'F', 'G', 'H', 'J', 'K', 'L', ';', ':', 0,   0,   ']', 'Z', 'X', 'C', 'V',
 		'B', 'N', 'M', ',', '.', '/', 0,   '*', 0,   ' ', 0,   0,   0,   0,   0,   0,
@@ -145,32 +154,53 @@ void HariMain(void)
 			memtotal / (1024 * 1024), memman_total(memman) / 1024);
 	putfonts8_asc_sht(sht_back, 0, 32, COL8_FFFFFF, COL8_0000FF, s, 40);
 	
+	// living and listening
+	// our heart and brain
 	for (;;) {
 		io_cli();
 		if (fifo32_status(&fifo) == 0) {
-			//io_stihlt();
 			task_sleep(task_a);
 			io_sti();
 		} else {
 			i = fifo32_get(&fifo);
 			io_sti();
-			if (256 <= i && i <= 511) { // keyboard data
+			
+			/* keyboard data */
+			if (256 <= i && i <= 511) { 
+			
+			
+			/*
 				sprintf(s, "%02X", i - 256);
 				putfonts8_asc_sht(sht_back, 0, 16, COL8_FFFFFF, COL8_0000FF, s, 2);
-				if (i < 256 + 0x54 && keytable[i - 256] != 0) {  // common characters
+				
+			*/	
+				
+				if (i < 256 + 0x54) {  // change key code to char code
+					if (key_shift == 0) {
+						s[0] = keytable[i - 256];
+					} else {
+						s[0] = keytable1[i - 256];
+					}			
+				} else {
+					s[0] = 0;
+				}
+				
+				/* common character */
+				if (s[0] != 0) {
 					if (key_to == 0) { // to task A
 						if (cursor_x < 128) {
 							// show a character, and then move the cursor 
-							s[0] = keytable[i - 256];
 							s[1] = 0;
 							putfonts8_asc_sht(sht_win, cursor_x, 28, COL8_000000, COL8_FFFFFF, s, 1);
 							cursor_x += 8;
 						}
 					} else { // to Console Window
-						fifo32_put(&task_cons->fifo, keytable[i - 256] + 256);
-					}				
+						fifo32_put(&task_cons->fifo, s[0] + 256);
+					}	
 				}
-				if (i == 256 + 0x0e) { // backspace key
+				
+				/* backspace key */
+				if (i == 256 + 0x0e) { 
 					if (key_to == 0) { // to TASK A
 						if (cursor_x > 8) {
 							// use space key to eliminate cursor, and then backspace the cursor
@@ -181,7 +211,9 @@ void HariMain(void)
 						fifo32_put(&task_cons->fifo, 8 + 256);
 					}
 				}
-				if (i == 256 + 0x0f) { // tab key
+				
+				/* tab key */
+				if (i == 256 + 0x0f) { 
 					if (key_to == 0) {
 						key_to = 1;
 						make_wtitle8(buf_win, sht_win->bxsize, "task_a", 0);
@@ -194,10 +226,28 @@ void HariMain(void)
 					sheet_refresh(sht_win, 0, 0, sht_win->bxsize, 21);
 					sheet_refresh(sht_cons, 0, 0, sht_cons->bxsize, 21);
 				}
+				
+				/* Shift key */
+				if (i == 256 + 0x2a) { // left Shift ON
+					key_shift |= 1;
+				}
+				if (i == 256 + 0x36) { // right Shift ON
+					key_shift |= 2;
+				}
+				if (i == 256 + 0xaa) { // left Shift OFF
+					key_shift &= ~1;
+				}
+				if (i == 256 + 0xb6) { // right Shift OFF
+					key_shift &= ~2;
+				}
+				
+				
 				// show cursor again
 				boxfill8(sht_win->buf, sht_win->bxsize, cursor_c, cursor_x, 28, cursor_x + 7, 43);
 				sheet_refresh(sht_win, cursor_x, 28, cursor_x + 8, 44);
-			} else if (512 <= i && i <= 767) { // mouse data
+				
+			} else if (512 <= i && i <= 767) {
+				/* mouse data */
 				if (mouse_decode(&mdec, i - 512) != 0) {
 					// there are three bytes that have been received, so showing them
 					sprintf(s, "[lcr %4d %4d]", mdec.x, mdec.y);
@@ -239,7 +289,8 @@ void HariMain(void)
 						sheet_slide(sht_win, mx - 80, my - 8);
 					}
 				}
-			} else if (i <= 1) { // the cursor timer			
+			} else if (i <= 1) { 	
+				/* the cursor timer */
 				if (i != 0) {
 					timer_init(timer, &fifo, 0);
 					cursor_c = COL8_000000;
