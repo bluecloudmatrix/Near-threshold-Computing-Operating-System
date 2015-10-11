@@ -21,6 +21,8 @@ void HariMain(void)
 	int key_shift = 0;
 	
 	struct BOOTINFO *binfo = (struct BOOTINFO *) ADR_BOOTINFO;
+	int key_leds = (binfo->leds >> 4) & 7; 
+	
 	struct FIFO32 fifo;
 	char s[40];
 	int fifobuf[128];
@@ -183,6 +185,12 @@ void HariMain(void)
 					}			
 				} else {
 					s[0] = 0;
+				}
+				
+				if ('A' <= s[0] && s[0] <= 'Z') { // when the inputed char is English character
+					if (((key_leds & 4) == 0 && key_shift == 0) || ((key_leds & 4) != 0 && key_shift != 0)) {
+						s[0] += 0x20; //change uppercase to lowercase
+					}
 				}
 				
 				/* common character */
