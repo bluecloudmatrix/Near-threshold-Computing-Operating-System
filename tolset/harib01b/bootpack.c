@@ -150,11 +150,11 @@ void HariMain(void)
 	sheet_updown(sht_win_b[2], 4);
 	sheet_updown(sht_win,      5);
 	sheet_updown(sht_mouse,    6);
-	sprintf(s, "(%3d, %3d)", mx, my);
-	putfonts8_asc_sht(sht_back, 0, 0, COL8_FFFFFF, COL8_0000FF, s, 10);
-	sprintf(s, "memory %dMB   free : %dKB",
-			memtotal / (1024 * 1024), memman_total(memman) / 1024);
-	putfonts8_asc_sht(sht_back, 0, 32, COL8_FFFFFF, COL8_0000FF, s, 40);
+	//sprintf(s, "(%3d, %3d)", mx, my);
+	//putfonts8_asc_sht(sht_back, 0, 0, COL8_FFFFFF, COL8_0000FF, s, 10);
+	//sprintf(s, "memory %dMB   free : %dKB",
+	//		memtotal / (1024 * 1024), memman_total(memman) / 1024);
+	//putfonts8_asc_sht(sht_back, 0, 32, COL8_FFFFFF, COL8_0000FF, s, 40);
 	
 	// living and listening
 	// our heart and brain
@@ -270,7 +270,7 @@ void HariMain(void)
 				/* mouse data */
 				if (mouse_decode(&mdec, i - 512) != 0) {
 					// there are three bytes that have been received, so showing them
-					sprintf(s, "[lcr %4d %4d]", mdec.x, mdec.y);
+			/*		sprintf(s, "[lcr %4d %4d]", mdec.x, mdec.y);
 					if ((mdec.btn & 0x01) != 0) {
 						s[1] = 'L';
 					}
@@ -282,7 +282,7 @@ void HariMain(void)
 					}
 
 					putfonts8_asc_sht(sht_back, 32, 16, COL8_FFFFFF, COL8_0000FF, s, 15);
-					
+			*/		
 					// move mouse cursor
 					mx += mdec.x;
 					my += mdec.y;
@@ -301,8 +301,8 @@ void HariMain(void)
 						my = binfo->scrny - 1;
 					}
 					
-					sprintf(s, "(%3d, %3d)", mx, my);
-					putfonts8_asc_sht(sht_back, 0, 0, COL8_FFFFFF, COL8_0000FF, s, 15);
+			//		sprintf(s, "(%3d, %3d)", mx, my);
+			//		putfonts8_asc_sht(sht_back, 0, 0, COL8_FFFFFF, COL8_0000FF, s, 15);
 					sheet_slide(sht_mouse, mx, my);
 					if ((mdec.btn & 0x01) != 0) {
 						// put the left key of mouse, and then shift the window
